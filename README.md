@@ -1,10 +1,14 @@
 # Coach Overseer dashboard
 
 A responsive Svelte dashboard for a day-at-a-glance view of travel plans, coach readiness, and live system status.
+
+** Note: This is the front for the ESP32 based "Nomad Device Monitor",
+[Nomad Device Monitor](https://github.com/Thuetar/Nomad-Device-Monitor)
+
+
+
 ## Home Screen
 ![dashboard](Docs/images/Dashboard-Home.png)
-
-
 
 ## Systems 
 ![dashboard preview](Docs/images/Dashboard_System_Page.png)
