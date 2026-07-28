@@ -1,6 +1,20 @@
 # Coach Overseer dashboard
 
 A responsive Svelte dashboard for a day-at-a-glance view of travel plans, coach readiness, and live system status.
+## Home Screen
+![dashboard](Docs/images/Dashboard-Home.png)
+
+
+
+## Systems 
+![dashboard preview](Docs/images/Dashboard_System_Page.png)
+
+## Daily Reminders 
+![dashboard preview](Docs/images/Dashboard_Day-Cal.png)
+
+## Configure
+![dashboard preview](Docs/images/Dashboard_System_Page.png)
+
 
 ## Device data source
 

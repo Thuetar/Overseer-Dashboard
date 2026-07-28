@@ -383,6 +383,43 @@
             {/each}
           </div>
         </section>
+
+        <section class="content-panel preview-panel" aria-label="Dashboard screenshots">
+          <div class="section-title">
+            <div><p class="eyebrow">Preview</p><h2>Dashboard Views</h2></div>
+            <span>Included screenshots</span>
+          </div>
+          <div class="preview-grid">
+            <article class="preview-card">
+              <img src="/Docs/images/Dashboard-Home.png" alt="Coach Overseer home dashboard" />
+              <div>
+                <strong>Home screen</strong>
+                <p>Overview of the day plan, trip readiness, and live systems.</p>
+              </div>
+            </article>
+            <article class="preview-card">
+              <img src="/Docs/images/Dashboard System Page.png" alt="Coach Overseer systems dashboard" />
+              <div>
+                <strong>Systems view</strong>
+                <p>Water, waste, power, and connectivity details in one place.</p>
+              </div>
+            </article>
+            <article class="preview-card">
+              <img src="/Docs/images/Dashboard_Day-Cal.png" alt="Coach Overseer travel day calendar" />
+              <div>
+                <strong>Travel timeline</strong>
+                <p>Scheduled stops, route progress, and upcoming events.</p>
+              </div>
+            </article>
+            <article class="preview-card">
+              <img src="/Docs/images/Dashboard_Configure.png" alt="Coach Overseer configuration view" />
+              <div>
+                <strong>Configuration</strong>
+                <p>Connect the dashboard to a live device monitor source.</p>
+              </div>
+            </article>
+          </div>
+        </section>
       </div>
 
     {:else if activeView === 'today'}
