@@ -20,6 +20,7 @@ A responsive Svelte dashboard for a day-at-a-glance view of travel plans, coach 
 ![dashboard preview](Docs/images/Dashboard_System_Page.png)
 
 
+
 ## Device data source
 
 Open **Settings → Data Source** in the dashboard and enter the base address of a Nomad Device Monitor, such as `http://tankman.local`. The address and refresh interval are saved in browser storage for that device.
@@ -35,7 +36,7 @@ Until a source is configured, the dashboard keeps its original sample values. Wh
 ## Run locally
 
 ```bash
-npm install
+  
 npm run dev
 ```
 
