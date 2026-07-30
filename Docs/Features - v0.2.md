@@ -1,6 +1,6 @@
 # New Features
 
-## Feature Storage Management 
+## Feature: Storage Management 
 
 Use Cases:
     Use Case: User asks how much flash is used & available.
@@ -30,7 +30,9 @@ use Side Menu & a Tree View as file picker
 Page title/header label "Log & File Management"
 
 -- 
-## Feature VictronEnergy Integration
+## Feature: VictronEnergy Integration
 Use Cases:
 read main KPIs (state of charge, battery level, and current) 
+
+*How*
 Add new Connection in Settings for VRM
