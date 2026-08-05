@@ -31,6 +31,8 @@ The dashboard reuses the monitor's existing read APIs:
 - `GET /api/tank`
 - `GET /api/tank/config`
 
+Settings also includes **Advanced → Log & File Management**. This page shows FFat usage, presents the device filesystem as a tree, downloads regular files, and deletes non-protected files. Device configuration files are download-only; editing and upload are not currently exposed.
+
 Until a source is configured, the dashboard keeps its original sample values. When the dashboard itself is served over HTTPS, the configured source must also be reachable over HTTPS because browsers block insecure API requests from secure pages.
 
 ## Run locally

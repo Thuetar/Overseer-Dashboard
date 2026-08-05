@@ -10,9 +10,14 @@
     CircleGauge,
     CloudSun,
     Database,
+    Download,
     Droplets,
+    File,
+    FileJson,
     Flame,
+    Folder,
     Gauge,
+    HardDrive,
     LayoutDashboard,
     MapPin,
     Navigation,
@@ -27,6 +32,7 @@
     Sun,
     Sunset,
     Thermometer,
+    Trash2,
     Wifi,
     WifiOff,
     X
@@ -37,6 +43,12 @@
     loadDataSourceConfig,
     saveDataSourceConfig
   } from './lib/deviceDataSource.js';
+  import {
+    buildStorageFileUrl,
+    deleteStorageFile,
+    fetchStorageSnapshot,
+    formatBytes
+  } from './lib/storageDataSource.js';
 
   let activeView = 'overview';
   let pumpOn = true;
@@ -48,6 +60,11 @@
   let sourceState = 'unconfigured';
   let sourceMessage = 'Add a device address to begin receiving live data.';
   let settingsMessage = '';
+  let settingsSection = 'data-source';
+  let storageSnapshot = null;
+  let storageState = 'idle';
+  let storageMessage = 'Open Advanced to read storage information from the device.';
+  let selectedStoragePath = '';
   let snapshot = null;
   let refreshTimer;
   let refreshRequest = 0;
@@ -90,6 +107,10 @@
   $: systems = [...visibleTankSystems.slice(0, 3), ...coachSystems];
   $: graySystem = visibleTankSystems.find((system) => system.type === 'gray' || system.label.toLowerCase().includes('gray'));
   $: activeTankAlert = buildTankAlert(snapshot, visibleTankSystems);
+  $: selectedStorageEntry = storageSnapshot?.files.find((entry) => entry.path === selectedStoragePath) ?? null;
+  $: storageUsedPercent = storageSnapshot?.stats?.total_bytes > 0
+    ? Math.min(100, (storageSnapshot.stats.used_bytes / storageSnapshot.stats.total_bytes) * 100)
+    : 0;
   $: interiorTemperature = Number.isFinite(snapshot?.status?.temp_f) && snapshot.status.aht_valid
     ? `${formatNumber(snapshot.status.temp_f, 1)}°F`
     : '71°F';
@@ -245,6 +266,56 @@
       }
     } catch (error) {
       settingsMessage = error?.message || 'Enter a valid device address.';
+    }
+  }
+
+  function storageEntryDepth(entry) {
+    return Math.max(0, String(entry?.path ?? '').split('/').filter(Boolean).length - 1);
+  }
+
+  async function selectSettingsSection(section) {
+    settingsSection = section;
+    if (section === 'advanced') await refreshStorage();
+  }
+
+  async function refreshStorage() {
+    if (!sourceConfig.baseUrl) {
+      storageState = 'unconfigured';
+      storageMessage = 'Configure a device address under Data Source first.';
+      storageSnapshot = null;
+      return;
+    }
+
+    storageState = 'loading';
+    storageMessage = `Reading storage from ${sourceConfig.baseUrl}`;
+    try {
+      storageSnapshot = await fetchStorageSnapshot(sourceConfig);
+      storageState = 'ready';
+      storageMessage = storageSnapshot.truncated
+        ? 'Showing the first 128 filesystem entries.'
+        : `${storageSnapshot.files.length} filesystem entries found.`;
+      if (!storageSnapshot.files.some((entry) => entry.path === selectedStoragePath)) {
+        selectedStoragePath = '';
+      }
+    } catch (error) {
+      storageState = 'error';
+      storageMessage = error?.name === 'AbortError' ? 'Storage request timed out.' : error?.message || 'Unable to read storage.';
+    }
+  }
+
+  async function removeSelectedStorageFile() {
+    if (!selectedStorageEntry?.deletable) return;
+    if (!window.confirm(`Delete ${selectedStorageEntry.path}? This cannot be undone.`)) return;
+
+    storageState = 'loading';
+    storageMessage = `Deleting ${selectedStorageEntry.path}…`;
+    try {
+      await deleteStorageFile(sourceConfig, selectedStorageEntry.path);
+      selectedStoragePath = '';
+      await refreshStorage();
+    } catch (error) {
+      storageState = 'error';
+      storageMessage = error?.name === 'AbortError' ? 'Delete request timed out.' : error?.message || 'Unable to delete file.';
     }
   }
 
@@ -511,49 +582,136 @@
 
     {:else}
       <div class="page settings-page">
-        <section class="day-heading">
-          <div><p class="eyebrow">Dashboard Configuration</p><h1>Data Source</h1><p>Connect Coach Overseer to the Nomad Device Monitor already on your network.</p></div>
-          <div class:online={sourceState === 'online'} class:offline={sourceState === 'offline'} class="source-state">
-            {#if sourceState === 'offline'}<WifiOff size={17} />{:else}<Database size={17} />{/if}
-            {sourceState === 'unconfigured' ? 'Not configured' : sourceState}
-          </div>
-        </section>
+        <div class="settings-layout">
+          <aside class="settings-menu system-group" aria-label="Settings sections">
+            <p class="eyebrow">Settings</p>
+            <button class:active={settingsSection === 'data-source'} on:click={() => selectSettingsSection('data-source')}>
+              <Database size={18} /><span><strong>Data Source</strong><small>Device connection</small></span><ChevronRight size={16} />
+            </button>
+            <button class:active={settingsSection === 'advanced'} on:click={() => selectSettingsSection('advanced')}>
+              <HardDrive size={18} /><span><strong>Advanced</strong><small>Logs and files</small></span><ChevronRight size={16} />
+            </button>
+          </aside>
 
-        <div class="settings-grid">
-          <section class="system-group source-card">
-            <div class="section-title"><div><p class="eyebrow">Nomad Device Monitor</p><h2>Connection</h2></div><Database size={22} /></div>
-            <form on:submit|preventDefault={saveSource}>
-              <label for="source-url">Device address</label>
-              <input id="source-url" type="url" placeholder="http://tankman.local" bind:value={sourceDraft.baseUrl} />
-              <small>Enter the device origin only. The dashboard uses its existing status and tank API endpoints.</small>
+          <div class="settings-content">
+            {#if settingsSection === 'data-source'}
+              <section class="day-heading">
+                <div><p class="eyebrow">Dashboard Configuration</p><h1>Data Source</h1><p>Connect Coach Overseer to the Nomad Device Monitor already on your network.</p></div>
+                <div class:online={sourceState === 'online'} class:offline={sourceState === 'offline'} class="source-state">
+                  {#if sourceState === 'offline'}<WifiOff size={17} />{:else}<Database size={17} />{/if}
+                  {sourceState === 'unconfigured' ? 'Not configured' : sourceState}
+                </div>
+              </section>
 
-              <label for="refresh-interval">Refresh interval</label>
-              <select id="refresh-interval" bind:value={sourceDraft.refreshIntervalSeconds}>
-                <option value={5}>5 seconds</option>
-                <option value={15}>15 seconds</option>
-                <option value={30}>30 seconds</option>
-                <option value={60}>1 minute</option>
-                <option value={300}>5 minutes</option>
-              </select>
+              <div class="settings-grid">
+                <section class="system-group source-card">
+                  <div class="section-title"><div><p class="eyebrow">Nomad Device Monitor</p><h2>Connection</h2></div><Database size={22} /></div>
+                  <form on:submit|preventDefault={saveSource}>
+                    <label for="source-url">Device address</label>
+                    <input id="source-url" type="url" placeholder="http://tankman.local" bind:value={sourceDraft.baseUrl} />
+                    <small>Enter the device origin only. The dashboard uses its existing status and tank API endpoints.</small>
 
-              <div class="form-actions">
-                <button class="primary-button" type="submit"><Save size={16} /> Save & connect</button>
-                <button class="secondary-button" type="button" disabled={!sourceConfig.baseUrl || refreshing} on:click={refreshData}>
-                  <RefreshCw size={16} /> Refresh now
-                </button>
+                    <label for="refresh-interval">Refresh interval</label>
+                    <select id="refresh-interval" bind:value={sourceDraft.refreshIntervalSeconds}>
+                      <option value={5}>5 seconds</option>
+                      <option value={15}>15 seconds</option>
+                      <option value={30}>30 seconds</option>
+                      <option value={60}>1 minute</option>
+                      <option value={300}>5 minutes</option>
+                    </select>
+
+                    <div class="form-actions">
+                      <button class="primary-button" type="submit"><Save size={16} /> Save & connect</button>
+                      <button class="secondary-button" type="button" disabled={!sourceConfig.baseUrl || refreshing} on:click={refreshData}>
+                        <RefreshCw size={16} /> Refresh now
+                      </button>
+                    </div>
+                    {#if settingsMessage}<p class="form-message">{settingsMessage}</p>{/if}
+                  </form>
+                </section>
+
+                <section class="system-group source-summary">
+                  <div class="section-title"><div><p class="eyebrow">Connection Status</p><h2>{sourceState === 'online' ? 'Receiving live data' : sourceState === 'offline' ? 'Device unavailable' : 'Using sample data'}</h2></div></div>
+                  <p>{sourceMessage}</p>
+                  <div class="detail-row"><span>Device</span><strong>{sourceConfig.baseUrl || 'Not set'}</strong></div>
+                  <div class="detail-row"><span>Refresh cadence</span><strong>{sourceConfig.refreshIntervalSeconds} sec</strong></div>
+                  <div class="detail-row"><span>Last update</span><strong>{lastUpdated}</strong></div>
+                  <p class="source-note">If this dashboard is opened over HTTPS, use an HTTPS-accessible device endpoint. Browsers block insecure device requests from secure pages.</p>
+                </section>
               </div>
-              {#if settingsMessage}<p class="form-message">{settingsMessage}</p>{/if}
-            </form>
-          </section>
+            {:else}
+              <section class="day-heading">
+                <div><p class="eyebrow">Advanced Remote Management</p><h1>Log &amp; File Management</h1><p>Review device storage and download or remove files from the local filesystem.</p></div>
+                <button class:refreshing={storageState === 'loading'} class="secondary-button storage-refresh" disabled={storageState === 'loading'} on:click={refreshStorage}>
+                  <RefreshCw size={16} /> Refresh
+                </button>
+              </section>
 
-          <section class="system-group source-summary">
-            <div class="section-title"><div><p class="eyebrow">Connection Status</p><h2>{sourceState === 'online' ? 'Receiving live data' : sourceState === 'offline' ? 'Device unavailable' : 'Using sample data'}</h2></div></div>
-            <p>{sourceMessage}</p>
-            <div class="detail-row"><span>Device</span><strong>{sourceConfig.baseUrl || 'Not set'}</strong></div>
-            <div class="detail-row"><span>Refresh cadence</span><strong>{sourceConfig.refreshIntervalSeconds} sec</strong></div>
-            <div class="detail-row"><span>Last update</span><strong>{lastUpdated}</strong></div>
-            <p class="source-note">If this dashboard is opened over HTTPS, use an HTTPS-accessible device endpoint. Browsers block insecure device requests from secure pages.</p>
-          </section>
+              <section class="storage-stats" aria-label="Filesystem usage">
+                <article><span>Total</span><strong>{formatBytes(storageSnapshot?.stats?.total_bytes)}</strong></article>
+                <article><span>Used</span><strong>{formatBytes(storageSnapshot?.stats?.used_bytes)}</strong></article>
+                <article><span>Available</span><strong>{formatBytes(storageSnapshot?.stats?.free_bytes)}</strong></article>
+                <article class="storage-meter-card">
+                  <span>Utilization</span><strong>{storageSnapshot ? `${storageUsedPercent.toFixed(1)}%` : '—'}</strong>
+                  <div class="storage-meter"><i style={`width: ${storageUsedPercent}%`}></i></div>
+                </article>
+              </section>
+
+              <div class="file-management-grid">
+                <section class="system-group file-tree-panel">
+                  <div class="section-title"><div><p class="eyebrow">File Picker</p><h2>Local filesystem</h2></div><Folder size={22} /></div>
+                  <p class:error={storageState === 'error'} class="storage-message">{storageMessage}</p>
+                  <div class="file-tree" role="tree" aria-label="Device files">
+                    {#if storageSnapshot?.files.length}
+                      {#each storageSnapshot.files as entry}
+                        <button
+                          class:active={selectedStoragePath === entry.path}
+                          class:directory={entry.type === 'directory'}
+                          role="treeitem"
+                          aria-selected={selectedStoragePath === entry.path}
+                          style={`--tree-depth: ${storageEntryDepth(entry)}`}
+                          on:click={() => selectedStoragePath = entry.path}
+                        >
+                          {#if entry.type === 'directory'}
+                            <Folder size={17} />
+                          {:else if entry.name.endsWith('.json')}
+                            <FileJson size={17} />
+                          {:else}
+                            <File size={17} />
+                          {/if}
+                          <span><strong>{entry.name}</strong><small>{entry.type === 'directory' ? entry.path : formatBytes(entry.size_bytes)}</small></span>
+                          {#if entry.protected}<em>Protected</em>{/if}
+                        </button>
+                      {/each}
+                    {:else if storageState !== 'loading'}
+                      <div class="file-tree-empty"><Folder size={24} /><span>No files found.</span></div>
+                    {/if}
+                  </div>
+                </section>
+
+                <section class="system-group file-actions-panel">
+                  <div class="section-title"><div><p class="eyebrow">Selection</p><h2>{selectedStorageEntry?.name || 'Choose a file'}</h2></div></div>
+                  {#if selectedStorageEntry}
+                    <div class="detail-row"><span>Path</span><strong>{selectedStorageEntry.path}</strong></div>
+                    <div class="detail-row"><span>Type</span><strong>{selectedStorageEntry.type}</strong></div>
+                    <div class="detail-row"><span>Size</span><strong>{formatBytes(selectedStorageEntry.size_bytes)}</strong></div>
+                    <div class="file-actions">
+                      {#if selectedStorageEntry.downloadable}
+                        <a class="primary-button" href={buildStorageFileUrl(sourceConfig, selectedStorageEntry.path)}><Download size={16} /> Download</a>
+                      {/if}
+                      <button class="danger-button" disabled={!selectedStorageEntry.deletable || storageState === 'loading'} on:click={removeSelectedStorageFile}>
+                        <Trash2 size={16} /> Delete
+                      </button>
+                    </div>
+                    {#if selectedStorageEntry.protected}<p class="source-note">This device configuration file is download-only.</p>{/if}
+                    {#if selectedStorageEntry.type === 'directory'}<p class="source-note">Select a file inside this directory to manage it.</p>{/if}
+                  {:else}
+                    <div class="file-selection-empty"><File size={28} /><p>Select a file from the tree to see its details and available actions.</p></div>
+                  {/if}
+                </section>
+              </div>
+            {/if}
+          </div>
         </div>
       </div>
     {/if}

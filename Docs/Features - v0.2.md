@@ -6,13 +6,13 @@ Use Cases:
     Use Case: User asks how much flash is used & available.
     Use Case: User wants to download the log file.
     Use Case: User wants to download the config file.
-    Use Case: User edits the config file.
-    Use Case: User uploads edited config file.
+    Deferred: User edits the config file.
+    Deferred: User uploads edited config file.
 
 - Storage Features
 -- Get local file system stats (extend overseer::platform::storage)  
 -- Get File(s) on FS
--- Get/Put/Delete file (extend)
+-- Get/Delete file (Put is deferred)
 -- Note: Log actions
 
 - Extend Firmware
